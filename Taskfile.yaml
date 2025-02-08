@@ -1,0 +1,26 @@
+# https://taskfile.dev
+
+version: "3"
+
+env:
+  VERSION: git rev-parse --short=4 HEAD
+dotenv: ["env/.env"]
+
+tasks:
+  build:dockerimage:
+    cmd: docker build -t template-golang -f ./config/dockerfile .
+
+  start:dev:
+    cmd: go tool air -c ./config/air.toml
+
+  start:dev:dockerimage:
+    cmd: docker run
+      --env-file ./env/.env
+      -p 3000:3000
+      --rm -it template-golang
+
+  local:clear:
+    cmd: rm -r ./local/*
+
+  grafana:start:
+    cmd: docker compose -f ./config/docker-compose.grafana.yaml up -d
