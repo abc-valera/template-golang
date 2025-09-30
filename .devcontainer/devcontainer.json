@@ -1,27 +1,30 @@
 {
-	"name": "samlless-reverse-proxy",
+	"name": "template-golang devcontainer",
 
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
-
-	"workspaceMount": "source=${localWorkspaceFolder},target=/home/remote/workspace/samlless-reverse-proxy,type=bind",
-	"workspaceFolder": "/home/remote/workspace/samlless-reverse-proxy",
-	// TODO: add go cache and go mod cache mounts
+	"runArgs": ["--network=host"], // NOTE: remove this if undesired
+	"mounts": [
+		"source=${localEnv:HOME}/.cache/go-build,target=/home/remote/.cache/go-build,type=bind",
+		"source=${localEnv:HOME}/go/pkg/mod,target=/home/remote/go/pkg/mod,type=bind"
+	],
+	"postCreateCommand": "sudo chown -R remote:remote /home/remote/.cache",
 
 	"features": {
 		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {}
 	},
 
-	"forwardPorts": [3000, 3001, 3002, 3003],
-
-	"remoteUser": "remote",
-	"postCreateCommand": "bash .devcontainer/post-create.sh",
-
 	"customizations": {
 		"vscode": {
-			"extensions": ["golang.go", "esbenp.prettier-vscode"]
+			"extensions": [
+				"golang.go",
+				"esbenp.prettier-vscode",
+				"Gruntfuggly.todo-tree",
+				"tamasfe.even-better-toml",
+				"dotenv.dotenv-vscode"
+			]
 		}
 	}
 }
