@@ -4,8 +4,8 @@
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
-	"runArgs": ["--network=host"], // NOTE: remove this if undesired
-	"mounts": [
+	"runArgs": ["--network=host"], // Remove this if undesired
+	"mounts": [ // Make sure these directories exist on host machine
 		"source=${localEnv:HOME}/.cache/go-build,target=/home/remote/.cache/go-build,type=bind",
 		"source=${localEnv:HOME}/go/pkg/mod,target=/home/remote/go/pkg/mod,type=bind"
 	],
