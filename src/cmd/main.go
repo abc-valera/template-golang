@@ -9,23 +9,29 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"runtime/debug"
 	"time"
 
-	"github.com/abc-valera/template-golang/src/features/greetings"
-	"github.com/abc-valera/template-golang/src/shared/app"
-	"github.com/abc-valera/template-golang/src/shared/env"
-	"github.com/abc-valera/template-golang/src/shared/log"
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humago"
+
+	"template-golang/src/features/echo"
+	"template-golang/src/shared/buildVersion"
+	"template-golang/src/shared/errutil/must"
+	"template-golang/src/shared/log"
+	"template-golang/src/shared/log/logView"
 )
 
 func main() {
-	mux := http.NewServeMux()
-
-	if env.LoadBool("IS_PPROF_ENABLED") {
-		// Enable mutex and block profiling
+	// Set global configurations here
+	if must.GetEnvBool("IS_MUTEX_BLOCK_PPROF_ENABLED") {
 		runtime.SetMutexProfileFraction(1)
 		runtime.SetBlockProfileRate(1)
+	}
 
+	// Create a default ServeMux first, these routes won't be shown in the generated API docs
+	mux := http.NewServeMux()
+
+	if must.GetEnvBool("IS_HTTP_PPROF_INTERFACE_ENABLED") {
 		mux.HandleFunc("GET /debug/pprof/", pprof.Index)
 		mux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
 		mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
@@ -33,76 +39,83 @@ func main() {
 		mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
 	}
 
-	mux.HandleFunc("/", greetings.Handler)
-	mux.HandleFunc("/version", app.VersionHandler)
+	mux.HandleFunc("GET /build-version", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(buildVersion.Get()))
+	})
 
-	var handler http.Handler = mux
-	handler = applyCorsMiddleware(handler)
-	handler = applyRecovererMiddleware(handler)
+	// Create Huma http server configuration
+	humaConfig := huma.Config{
+		OpenAPI: &huma.OpenAPI{
+			OpenAPI: "3.1.0",
+			Info: &huma.Info{
+				Title:   "template-golang Docs",
+				Version: "0.1.0",
+			},
+			Components: &huma.Components{
+				Schemas: huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer),
+			},
+		},
+		OpenAPIPath:   "/openapi",
+		DocsPath:      "/",
+		SchemasPath:   "/schemas",
+		Formats:       huma.DefaultFormats,
+		DefaultFormat: "application/json",
+		CreateHooks: []func(huma.Config) huma.Config{
+			func(c huma.Config) huma.Config {
+				// Add a link transformer to the API. This adds `Link` headers and
+				// puts `$schema` fields in the response body which point to the JSON
+				// Schema that describes the response structure.
+				// This is a create hook so we get the latest schema path setting.
+				linkTransformer := huma.NewSchemaLinkTransformer("#/components/schemas/", c.SchemasPath)
+				c.OnAddOperation = append(c.OnAddOperation, linkTransformer.OnAddOperation)
+				c.Transformers = append(c.Transformers, linkTransformer.Transform)
+				return c
+			},
+		},
+	}
 
-	server := http.Server{
-		Addr:    ":" + env.Load("PORT"),
-		Handler: handler,
+	humaApi := humago.New(mux, humaConfig)
+
+	// Set middlewares
+	humaApi.UseMiddleware(
+		recovererMiddleware,
+		corsMiddleware,
+		logView.ApplyLogMiddleware,
+	)
+
+	// Register features
+	echo.ApplyRoutes(humaApi)
+
+	// Create a default HTTP server
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%s", must.GetEnv("WEBAPI_PORT")),
+		Handler: humaApi.Adapter(),
 	}
 
 	go func() {
-		fmt.Println("Server is running on port", server.Addr)
+		log.Info("HTTP server is running",
+			"port", "http://localhost"+server.Addr,
+			"build-version", buildVersion.Get(),
+		)
+
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			panic(err)
 		}
 	}()
-
-	log.Info("App has started", "version", app.Version())
 
 	// Stop program execution until receiving an interrupt signal
 	gracefulShutdown := make(chan os.Signal, 1)
 	signal.Notify(gracefulShutdown, os.Interrupt)
 	<-gracefulShutdown
 
-	// Gracefully shutdown the http server
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	log.Info("received interrupt signal, shutting down...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
 		panic(err)
 	}
-}
 
-func applyRecovererMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(
-		func(rw http.ResponseWriter, r *http.Request) {
-			defer func() {
-				if err := recover(); err != nil {
-					rw.WriteHeader(http.StatusInternalServerError)
-
-					// Check if the error is of type error
-					if _, ok := err.(error); !ok {
-						err = fmt.Errorf("%v", err)
-					}
-
-					log.Error("PANIC_OCCURED",
-						"err", err,
-						"stack", debug.Stack(),
-					)
-				}
-			}()
-			next.ServeHTTP(rw, r)
-		},
-	)
-}
-
-func applyCorsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With")
-
-			if r.Method == "OPTIONS" {
-				w.WriteHeader(http.StatusOK)
-			} else {
-				next.ServeHTTP(w, r)
-			}
-		},
-	)
+	log.Info("server gracefully stopped")
 }

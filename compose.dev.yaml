@@ -1,0 +1,15 @@
+name: template-golang-dev
+services:
+  webapi:
+    build:
+      context: .
+      dockerfile: ./src/cmd/Dockerfile.dev
+      args:
+        WORKDIR_PATH: ${PWD}
+    ports:
+      - "2345:2345" # Delve debugger port
+    volumes:
+      - ${PWD}/local:${PWD}/local
+      # NOTE: mount Golang cache directories to speed up Air builds
+      - ${HOME}/go/pkg/mod:/root/go/pkg/mod
+      - ${HOME}/.cache/go-build:/root/.cache/go-build

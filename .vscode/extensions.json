@@ -1,9 +1,11 @@
 {
-  "recommendations": [
-    "golang.go",
-    "esbenp.prettier-vscode",
-    "Gruntfuggly.todo-tree",
-    "tamasfe.even-better-toml",
-    "dotenv.dotenv-vscode"
-  ]
+	"recommendations": [
+		"golang.go",
+		"tamasfe.even-better-toml",
+		"dotenv.dotenv-vscode",
+		"docker.docker",
+		"gruntfuggly.todo-tree",
+		"mads-hartmann.bash-ide-vscode",
+		"esbenp.prettier-vscode"
+	]
 }

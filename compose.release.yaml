@@ -1,0 +1,13 @@
+name: template-golang-release
+services:
+  webapi:
+    build:
+      context: .
+      dockerfile: ./src/cmd/Dockerfile.release
+      args:
+        WORKDIR_PATH: ${PWD}
+        GOMODCACHE: ${HOME}/go/pkg/mod
+        GOCACHE: ${HOME}/.cache/go-build
+    volumes:
+      - ${PWD}/local:${PWD}/local
+    restart: always

@@ -1,0 +1,32 @@
+FROM golang:1.25.4-alpine3.22 AS builder
+
+RUN apk --no-cache add curl
+
+ARG WORKDIR_PATH
+ARG GOMODCACHE
+ARG GOCACHE
+
+WORKDIR ${WORKDIR_PATH}
+
+COPY ./src ./src
+COPY go.* .
+
+RUN --mount=type=cache,target=${GOMODCACHE} \
+	go mod download
+
+RUN --mount=type=cache,target=${GOMODCACHE} \
+	--mount=type=cache,target=${GOCACHE} \
+	go build -o /usr/bin/template-golang-webapi ./src/cmd
+
+FROM alpine:3.22 AS runner
+
+RUN apk --no-cache add curl
+
+# Variables that should be provided by the user
+ARG WORKDIR_PATH
+
+WORKDIR ${WORKDIR_PATH}
+
+COPY --from=builder /usr/bin/template-golang-webapi .
+
+CMD ["./template-golang-webapi"]

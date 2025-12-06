@@ -4,11 +4,17 @@
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
-	"runArgs": ["--network=host"], // Remove this if undesired
-	"mounts": [ // Make sure these directories exist on host machine
+
+	// Use the same network as the host. Remove this if undesired
+	"runArgs": ["--network=host"],
+
+	// Mount go cache folders from host to container to speed up builds,
+	// make sure these directories exist on host machine
+	"mounts": [
 		"source=${localEnv:HOME}/.cache/go-build,target=/home/remote/.cache/go-build,type=bind",
 		"source=${localEnv:HOME}/go/pkg/mod,target=/home/remote/go/pkg/mod,type=bind"
 	],
+
 	"postCreateCommand": "sudo chown -R remote:remote /home/remote/.cache",
 
 	"features": {

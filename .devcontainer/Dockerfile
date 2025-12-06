@@ -1,13 +1,13 @@
 FROM debian:bookworm
 
 # The version of Go can be customized
-ARG GO_VERSION=1.25.1
-
-# Create a non-root user with the same UID/GID as the host user.
+ARG GO_VERSION=1.25.4
 ARG USERNAME=remote
-# The same UID/GID as the host user to avoid permission issues
+
+# Create a non-root user with the same UID/GID as the host user to avoid permission issues
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
+
 # Install sudo first to be able to create the user
 RUN apt-get update -y && apt-get install -y sudo
 RUN groupadd --gid $USER_GID $USERNAME \
@@ -40,11 +40,11 @@ RUN apt-get install -y \
 
 RUN go install golang.org/x/tools/gopls@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \ 
+    && go install golang.org/x/tools/cmd/goimports@latest \
+    && go install honnef.co/go/tools/cmd/staticcheck@latest \
     && go install github.com/fatih/gomodifytags@latest \
     && go install github.com/josharian/impl@latest \
-    && go install github.com/cweill/gotests/...@latest \
-    && go install golang.org/x/tools/cmd/goimports@latest \
-    && go install honnef.co/go/tools/cmd/staticcheck@latest 
+    && go install github.com/cweill/gotests/...@latest
 
 # Switch to non-root user
 USER $USERNAME

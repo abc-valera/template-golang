@@ -5,12 +5,21 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/abc-valera/template-golang/src/shared/env"
+	"template-golang/src/shared/errutil/must"
+	"template-golang/src/shared/singleton"
 )
 
-var loggerVar = initLogger()
+var getLogger = singleton.New(func() loggerInterface {
+	switch must.GetEnv("LOGGER") {
+	case "stdout":
+		return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	case "nop":
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	default:
+		panic(must.ErrInvalidEnvValue)
+	}
+})
 
-// loggerInterface is used to provide a simpler interface for logging
 type loggerInterface interface {
 	Debug(message string, vals ...any)
 	Info(message string, vals ...any)
@@ -18,21 +27,12 @@ type loggerInterface interface {
 	Error(message string, vals ...any)
 }
 
-func initLogger() loggerInterface {
-	switch env.Load("LOGGER") {
-	case "slog_stdout":
-		return slog.New(slog.NewTextHandler(os.Stdout, nil))
-	case "nop":
-		return slog.New(slog.NewTextHandler(io.Discard, nil))
-	default:
-		panic(env.ErrInvalidEnvValue)
-	}
-}
+// TODO: add a separate type for the key-value pairs
 
-func Debug(message string, vals ...any) { loggerVar.Debug(message, vals...) }
+func Debug(message string, vals ...any) { getLogger().Debug(message, vals...) }
 
-func Info(message string, vals ...any) { loggerVar.Info(message, vals...) }
+func Info(message string, vals ...any) { getLogger().Info(message, vals...) }
 
-func Warn(message string, vals ...any) { loggerVar.Warn(message, vals...) }
+func Warn(message string, vals ...any) { getLogger().Warn(message, vals...) }
 
-func Error(message string, vals ...any) { loggerVar.Error(message, vals...) }
+func Error(message string, vals ...any) { getLogger().Error(message, vals...) }
